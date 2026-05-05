@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Network Threat Detector</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:       #050a0f;
+            --surface:  #0b1520;
+            --border:   #1a3a55;
+            --accent:   #00d4ff;
+            --danger:   #ff3c5a;
+            --safe:     #00ffaa;
+            --muted:    #4a7a99;
+            --text:     #cce8f4;
+            --font-mono: 'Share Tech Mono', monospace;
+            --font-ui:   'Rajdhani', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-ui);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 16px 60px;
+            background-image:
+                linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* ── Header ─────────────────────────────────── */
+        header { text-align: center; margin-bottom: 40px; animation: fadeDown .6s ease both; }
+        .logo-line { font-family: var(--font-mono); font-size: 11px; letter-spacing: 6px; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
+        h1 { font-size: clamp(28px,5vw,48px); font-weight: 700; letter-spacing: 3px; text-transform: uppercase; line-height: 1.1; }
+        h1 span { color: var(--accent); }
+        .subtitle { font-family: var(--font-mono); font-size: 12px; color: var(--muted); margin-top: 8px; letter-spacing: 2px; }
+
+        /* ── Card ────────────────────────────────────── */
+        .card {
+            width: 100%; max-width: 720px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 32px;
+            position: relative;
+            animation: fadeUp .6s ease both;
+        }
+        .card::before, .card::after { content: ''; position: absolute; width: 16px; height: 16px; border-color: var(--accent); border-style: solid; }
+        .card::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+        .card::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+        /* ── Upload ──────────────────────────────────── */
+        .upload-label {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 2px dashed var(--border); border-radius: 4px; padding: 36px 20px;
+            cursor: pointer; transition: border-color .2s, background .2s; gap: 10px;
+        }
+        .upload-label:hover { border-color: var(--accent); background: rgba(0,212,255,.04); }
+        .upload-icon { font-size: 36px; line-height: 1; }
+        .upload-label span  { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+        .upload-label strong { font-size: 15px; color: var(--text); font-family: var(--font-ui); letter-spacing: 1px; }
+        #file-input { display: none; }
+        #file-name  { font-family: var(--font-mono); font-size: 12px; color: var(--accent); margin-top: 10px; text-align: center; min-height: 18px; }
+
+        /* ── Buttons ─────────────────────────────────── */
+        .btn {
+            margin-top: 20px; width: 100%; padding: 14px;
+            background: transparent; color: var(--accent);
+            border: 1px solid var(--accent); border-radius: 3px;
+            font-family: var(--font-mono); font-size: 14px; letter-spacing: 3px;
+            text-transform: uppercase; cursor: pointer;
+            transition: background .2s, color .2s, box-shadow .2s;
+        }
+        .btn:hover { background: var(--accent); color: var(--bg); box-shadow: 0 0 20px rgba(0,212,255,.3); }
+
+        .btn-explain {
+            margin-top: 16px; padding: 10px 20px;
+            background: transparent; color: var(--accent);
+            border: 1px solid var(--accent); border-radius: 3px;
+            font-family: var(--font-mono); font-size: 12px; letter-spacing: 2px;
+            cursor: pointer; transition: background .2s;
+        }
+        .btn-explain:hover { background: rgba(0,212,255,.1); }
+
+        /* ── Error ───────────────────────────────────── */
+        .error-box {
+            margin-top: 20px; padding: 14px 16px;
+            background: rgba(255,60,90,.08); border: 1px solid var(--danger);
+            border-radius: 3px; font-family: var(--font-mono); font-size: 13px; color: var(--danger);
+        }
+
+        /* ── Verdict banner ──────────────────────────── */
+        .verdict-banner {
+            margin-top: 28px; padding: 18px; border-radius: 4px;
+            text-align: center; font-size: 22px; font-weight: 700;
+            letter-spacing: 3px; text-transform: uppercase;
+            animation: pulse 2s ease infinite;
+        }
+        .verdict-banner.attack { background: rgba(255,60,90,.1); border: 1px solid var(--danger); color: var(--danger); }
+        .verdict-banner.normal { background: rgba(0,255,170,.08); border: 1px solid var(--safe); color: var(--safe); }
+
+        /* ── Stats grid ──────────────────────────────── */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 20px; }
+        .stat-box { background: rgba(0,212,255,.04); border: 1px solid var(--border); border-radius: 3px; padding: 14px 10px; text-align: center; }
+        .stat-box .val { font-family: var(--font-mono); font-size: 26px; color: var(--accent); display: block; }
+        .stat-box .lbl { font-size: 11px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+        .stat-box.danger .val { color: var(--danger); }
+        .stat-box.safe   .val { color: var(--safe);   }
+
+        /* ── Section title ───────────────────────────── */
+        .section-title {
+            font-family: var(--font-mono); font-size: 10px; letter-spacing: 3px;
+            color: var(--muted); text-transform: uppercase;
+            margin: 24px 0 10px; padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* ── Chart ───────────────────────────────────── */
+        .chart-wrap {
+            background: rgba(0,212,255,.02); border: 1px solid var(--border);
+            border-radius: 3px; padding: 16px; height: 220px;
+        }
+
+        /* ── Feature importance ──────────────────────── */
+        .feat-table { width: 100%; border-collapse: collapse; }
+        .feat-table th {
+            font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px;
+            color: var(--muted); text-transform: uppercase;
+            padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border);
+        }
+        .feat-table td { padding: 9px 10px; border-bottom: 1px solid rgba(26,58,85,.5); font-family: var(--font-mono); font-size: 12px; }
+        .feat-bar-wrap { display: inline-block; vertical-align: middle; width: 140px; height: 6px; background: var(--border); border-radius: 2px; overflow: hidden; }
+        .feat-bar-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+
+        /* ── Results table ───────────────────────────── */
+        .table-scroll { max-height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 3px; }
+        .results-table { width: 100%; border-collapse: collapse; }
+        .results-table th {
+            font-family: var(--font-mono); font-size: 10px; letter-spacing: 2px;
+            color: var(--muted); text-transform: uppercase;
+            padding: 8px 12px; text-align: left;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            position: sticky; top: 0; z-index: 1;
+        }
+        .results-table td { padding: 7px 12px; border-bottom: 1px solid rgba(26,58,85,.4); font-family: var(--font-mono); font-size: 12px; }
+        .row-attack td { background: rgba(255,60,90,.05); }
+
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 2px; font-size: 11px; font-family: var(--font-mono); }
+        .badge-attack { background: rgba(255,60,90,.15); color: var(--danger); border: 1px solid var(--danger); }
+        .badge-normal { background: rgba(0,255,170,.10); color: var(--safe);   border: 1px solid var(--safe); }
+
+        .conf-wrap { display: flex; align-items: center; gap: 8px; }
+        .conf-bar  { flex: 1; max-width: 80px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+        .conf-fill { height: 100%; border-radius: 2px; }
+
+        /* ── Explain box ─────────────────────────────── */
+        .explain-box {
+            margin-top: 14px; padding: 16px;
+            background: rgba(0,212,255,.04);
+            border: 1px solid var(--border); border-left: 3px solid var(--accent);
+            border-radius: 3px; font-family: var(--font-mono); font-size: 12px;
+            line-height: 1.8; color: var(--text);
+        }
+
+        /* ── Misc ────────────────────────────────────── */
+        .file-info { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: right; }
+        .btn-reset { margin-top: 22px; }
+        footer { margin-top: 40px; font-family: var(--font-mono); font-size: 10px; color: var(--muted); letter-spacing: 2px; text-align: center; opacity: .5; }
+
+        /* ── Animations ──────────────────────────────── */
+        @keyframes fadeDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeUp   { from { opacity: 0; transform: translateY(20px);  } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse    { 0%, 100% { opacity: 1; } 50% { opacity: .75; } }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <p class="logo-line">CICIDS2017 // Random Forest</p>
+        <h1>Network <span>Threat</span> Detector</h1>
+        <p class="subtitle">Upload CSV &rarr; Analyse &rarr; Detect Attacks</p>
+    </header>
+
+    <div class="card">
+
+        <!-- ── Upload form ────────────────────────── -->
+        <form action="/predict" method="POST" enctype="multipart/form-data">
+            <label class="upload-label" for="file-input">
+                <span class="upload-icon">📂</span>
+                <strong>Drop or click to select a CSV file</strong>
+                <span>Network capture data in CICIDS2017 format</span>
+            </label>
+            <input type="file" id="file-input" name="file" accept=".csv"
+                   onchange="document.getElementById('file-name').textContent = this.files[0]?.name || ''" />
+            <p id="file-name"></p>
+            <button type="submit" class="btn">&#9654; &nbsp; Run Analysis</button>
+        </form>
+
+        <!-- ── Error ──────────────────────────────── -->
+        {% if error %}
+        <div class="error-box">&#9888; &nbsp;{{ error }}</div>
+        {% endif %}
+
+        <!-- ── Results ────────────────────────────── -->
+        {% if verdict %}
+
+        <div class="verdict-banner {{ 'attack' if attacks > 0 else 'normal' }}">
+            {{ '⚠ ' if attacks > 0 else '✓ ' }}{{ verdict }}
+        </div>
+
+        <!-- Summary counts -->
+        <div class="stats-grid">
+            <div class="stat-box">
+                <span class="val">{{ total }}</span>
+                <span class="lbl">Total Flows</span>
+            </div>
+            <div class="stat-box safe">
+                <span class="val">{{ normal }}</span>
+                <span class="lbl">Normal</span>
+            </div>
+            <div class="stat-box danger">
+                <span class="val">{{ attacks }}</span>
+                <span class="lbl">Attacks</span>
+            </div>
+        </div>
+
+        <!-- Bar chart -->
+        <p class="section-title">Traffic Distribution</p>
+        <div class="chart-wrap">
+            <canvas id="trafficChart"></canvas>
+        </div>
+
+        <!-- Top 3 influencing features -->
+        <p class="section-title">Top Influencing Features</p>
+        <table class="feat-table">
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Importance</th>
+                    <th>Weight</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for f in top_features %}
+            <tr>
+                <td>{{ f.name }}</td>
+                <td>{{ f.importance }}%</td>
+                <td>
+                    <div class="feat-bar-wrap">
+                        <div class="feat-bar-fill" style="width: {{ f.bar_pct }}%"></div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Per-row results table -->
+        <p class="section-title">Flow Results &mdash; top {{ rows|length }} of {{ total }} shown</p>
+        <div class="table-scroll">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Flow #</th>
+                        <th>Classification</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                <tr class="{{ 'row-attack' if row.is_attack else '' }}">
+                    <td>{{ row.index }}</td>
+                    <td>
+                        <span class="badge {{ 'badge-attack' if row.is_attack else 'badge-normal' }}">
+                            {{ row.label }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="conf-wrap">
+                            <div class="conf-bar">
+                                <div class="conf-fill"
+                                     style="width:{{ row.confidence }}%; background:{{ '#ff3c5a' if row.is_attack else '#00ffaa' }}">
+                                </div>
+                            </div>
+                            {{ row.confidence }}%
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Explain result -->
+        <button class="btn-explain" onclick="toggleExplain(this)">&#128269; &nbsp;Explain Result</button>
+        <div id="explain-box" class="explain-box" style="display:none">
+            {{ explanation }}
+        </div>
+
+        <p class="file-info">File analysed: {{ filename }}</p>
+        <button class="btn btn-reset" onclick="location.reload()">&#8617; &nbsp; Analyse Another File</button>
+
+        {% endif %}
+
+    </div>
+
+    <footer>AI-Driven Network Traffic Analysis</footer>
+
+    {% if verdict %}
+    <script>
+        // Bar chart (Chart.js)
+        const ctx = document.getElementById('trafficChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Normal Traffic', 'DDoS Attack'],
+                datasets: [{
+                    data: [{{ normal }}, {{ attacks }}],
+                    backgroundColor: ['rgba(0,255,170,.15)', 'rgba(255,60,90,.15)'],
+                    borderColor:     ['#00ffaa', '#ff3c5a'],
+                    borderWidth: 2,
+                    borderRadius: 3,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: c => ' ' + c.raw.toLocaleString() + ' flows'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#cce8f4', font: { family: 'Share Tech Mono', size: 11 } },
+                        grid:  { color: 'rgba(26,58,85,.6)' }
+                    },
+                    y: {
+                        ticks: { color: '#cce8f4', font: { family: 'Share Tech Mono', size: 11 } },
+                        grid:  { color: 'rgba(26,58,85,.6)' }
+                    }
+                }
+            }
+        });
+
+        // Toggle the explanation box
+        function toggleExplain(btn) {
+            const box = document.getElementById('explain-box');
+            if (box.style.display === 'none') {
+                box.style.display = 'block';
+                btn.textContent = '✕  Hide Explanation';
+            } else {
+                box.style.display = 'none';
+                btn.textContent = '🔍  Explain Result';
+            }
+        }
+    </script>
+    {% endif %}
+
+</body>
+</html>
